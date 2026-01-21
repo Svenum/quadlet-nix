@@ -39,7 +39,8 @@ in
             text = p._configText;
             mode = "0600";
           };
-        }) allObjects);
+        }) allObjects
+      );
       # The symlinks are not necessary for the services to be honored by systemd,
       # but necessary for NixOS activation process to pick them up for updates.
       systemd.packages = [
@@ -58,15 +59,41 @@ in
             unitConfig.X-QuadletNixConfigHash = builtins.hashString "sha256" p._configText;
             # systemd recommends multi-user.target over default.target.
             # https://www.freedesktop.org/software/systemd/man/latest/systemd.special.html#default.target
-            wantedBy = if p._autoStart then [ "multi-user.target" ] else [];
+            wantedBy = if p._autoStart then [ "multi-user.target" ] else [ ];
           };
         }) allObjects
       );
 
       systemd.timers.podman-auto-update = mkIf cfg.autoUpdate.enable {
-        timerConfig.OnCalendar = [ "" cfg.autoUpdate.calendar ];
+        timerConfig.OnCalendar = [
+          ""
+          cfg.autoUpdate.calendar
+        ];
         wantedBy = [ "timers.target" ];
         overrideStrategy = "asDropin";
       };
+
+      networking.firewall.interfaces =
+        let
+          networksWithInterface = builtins.filter (
+            name:
+            # Only create Network rule if:
+            # 1) networkConfig has "interfaceName" != null
+            # 2) networkConfig has "driver" == "bridge"
+            cfg.networks.${name}.networkConfig ? interfaceName
+            && cfg.networks.${name}.networkConfig ? driver
+            && cfg.networks.${name}.networkConfig.driver == "bridge"
+            && cfg.networks.${name}.networkConfig.interfaceName != null
+          ) (builtins.attrNames cfg.networks);
+          firewallConfig = builtins.listToAttrs (
+            map (name: {
+              name = cfg.networks.${name}.networkConfig.interfaceName;
+              value = {
+                allowedUDPPorts = [ 53 ];
+              };
+            }) networksWithInterface
+          );
+        in
+        lib.mkIf config.networking.firewall.enable firewallConfig;
     };
 }
