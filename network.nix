@@ -55,18 +55,6 @@ let
       property = "Gateway";
     };
 
-    interfaceName = quadletOptions.mkOption {
-      type = types.nullOr types.str;
-      default = null;
-      example = "podman1";
-      cli = "--interface-name";
-      property = "InterfaceName";
-      description = ''
-        `virtualisation.quadlet.networks.<name>.networkConfig.drvier = "bridge"`: set Bridge Interface
-        `virtualisation.quadlet.networks.<name>.networkConfig.drvier = ["ipvlan" | "macvlan]`: same as `virtualisation.quadlet.networks.<name>.networkConfig.options.parent`
-      '';
-    };
-
     globalArgs = quadletOptions.mkOption {
       type = types.listOf types.str;
       default = [ ];
