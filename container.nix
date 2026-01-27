@@ -22,7 +22,7 @@ let
     addHosts = quadletOptions.mkOption {
       type = types.listOf types.str;
       default = [ ];
-      example = ["hostname:192.168.10.11"];
+      example = [ "hostname:192.168.10.11" ];
       cli = "--add-host";
       property = "AddHost";
     };
@@ -37,7 +37,10 @@ let
     };
 
     annotations = quadletOptions.mkOption {
-      type = types.oneOf [ (types.listOf types.str) (types.attrsOf types.str) ];
+      type = types.oneOf [
+        (types.listOf types.str)
+        (types.attrsOf types.str)
+      ];
       default = { };
       example = {
         annotation = "value";
@@ -58,6 +61,14 @@ let
       example = "registry";
       cli = "--label \"io.containers.autoupdate=...\"";
       property = "AutoUpdate";
+    };
+
+    appArmor = quadletOptions.mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      example = "alternate-profile";
+      cli = "--security-opt apparmor=...";
+      property = "AppArmor";
     };
 
     cgroupsMode = quadletOptions.mkOption {
@@ -118,7 +129,12 @@ let
     };
 
     entrypoint = quadletOptions.mkOption {
-      type = types.nullOr (types.oneOf [ types.str (types.listOf types.str) ]);
+      type = types.nullOr (
+        types.oneOf [
+          types.str
+          (types.listOf types.str)
+        ]
+      );
       default = null;
       example = "/foo.sh";
       cli = "--entrypoint";
@@ -155,7 +171,12 @@ let
     };
 
     exec = quadletOptions.mkOption {
-      type = types.nullOr (types.oneOf [ types.str (types.listOf types.str) ]);
+      type = types.nullOr (
+        types.oneOf [
+          types.str
+          (types.listOf types.str)
+        ]
+      );
       default = null;
       example = "/usr/bin/command";
       description = "Command after image specification";
@@ -175,7 +196,7 @@ let
 
     gidMaps = quadletOptions.mkOption {
       type = types.listOf types.str;
-      default = [  ];
+      default = [ ];
       example = [ "0:10000:10" ];
       cli = "--gidmap";
       property = "GIDMap";
@@ -184,7 +205,7 @@ let
 
     globalArgs = quadletOptions.mkOption {
       type = types.listOf types.str;
-      default = [  ];
+      default = [ ];
       example = [ "--log-level=debug" ];
       description = "Additional command line arguments to insert between `podman` and `run`";
       property = "GlobalArgs";
@@ -327,6 +348,13 @@ let
       property = "HostName";
     };
 
+    httpProxy = quadletOptions.mkOption {
+      type = types.nullOr types.bool;
+      default = null;
+      cli = "--http-proxy";
+      property = "HttpProxy";
+    };
+
     image = quadletOptions.mkOption {
       type = types.nullOr types.str;
       default = null;
@@ -352,7 +380,10 @@ let
     };
 
     labels = quadletOptions.mkOption {
-      type = types.oneOf [ (types.listOf types.str) (types.attrsOf types.str) ];
+      type = types.oneOf [
+        (types.listOf types.str)
+        (types.attrsOf types.str)
+      ];
       default = { };
       example = {
         foo = "bar";
@@ -429,7 +460,12 @@ let
     };
 
     notify = quadletOptions.mkOption {
-      type = types.enum [ null true false "healthy" ];
+      type = types.enum [
+        null
+        true
+        false
+        "healthy"
+      ];
       default = null;
       cli = "--sdnotify container";
       property = "Notify";
@@ -490,7 +526,12 @@ let
     };
 
     reloadCmd = quadletOptions.mkOption {
-      type = types.nullOr (types.oneOf [ types.str (types.listOf types.str) ]);
+      type = types.nullOr (
+        types.oneOf [
+          types.str
+          (types.listOf types.str)
+        ]
+      );
       default = null;
       description = "Adds ExecReload and run exec with the value";
       example = "/usr/bin/command";
@@ -746,18 +787,26 @@ in
       unitConfig = {
         Unit = {
           Description = "Podman container ${name}";
-        } // config.unitConfig;
+        }
+        // config.unitConfig;
         Container = quadletUtils.configToProperties containerConfig containerOpts;
         Service = serviceConfigDefault // config.serviceConfig;
-      } // (if quadlet == { } then { } else { Quadlet = quadlet; });
+      }
+      // (if quadlet == { } then { } else { Quadlet = quadlet; });
     in
-    {
-      _serviceName = name;
-      _configText = if config.rawConfig != null
-        then config.rawConfig
-        else quadletUtils.unitConfigToText unitConfig;
-      _autoStart = config.autoStart;
-      _autoEscapeRequired = quadletUtils.autoEscapeRequired containerConfig containerOpts;
-      ref = "${name}.container";
-    };
+    lib.pipe
+      {
+        _serviceName = name;
+        _configText =
+          if config.rawConfig != null then config.rawConfig else quadletUtils.unitConfigToText unitConfig;
+        _autoStart = config.autoStart;
+        _autoEscapeRequired = quadletUtils.autoEscapeRequired containerConfig containerOpts;
+        ref = "${name}.container";
+
+        # quadlet default is "split" which does not work rootless under system systemd.
+        containerConfig.cgroupsMode = lib.mkIf config._rootless (lib.mkDefault "enabled");
+      }
+      [
+        (quadletOptions.applyRootlessConfig config)
+      ];
 }

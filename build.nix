@@ -11,7 +11,10 @@ let
 
   buildOpts = {
     annotations = quadletOptions.mkOption {
-      type = types.oneOf [ (types.listOf types.str) (types.attrsOf types.str) ];
+      type = types.oneOf [
+        (types.listOf types.str)
+        (types.attrsOf types.str)
+      ];
       default = { };
       example = {
         annotation = "value";
@@ -35,6 +38,20 @@ let
       example = "/etc/registry/auth.json";
       cli = "--authfile";
       property = "AuthFile";
+    };
+
+    buildArgs = quadletOptions.mkOption {
+      type = types.oneOf [
+        (types.listOf types.str)
+        (types.attrsOf types.str)
+      ];
+      default = { };
+      example = {
+        foo = "bar";
+      };
+      cli = "--build-arg";
+      property = "BuildArg";
+      encoders.scalar = encoders.scalar.quotedEscaped;
     };
 
     modules = quadletOptions.mkOption {
@@ -112,6 +129,14 @@ let
       property = "GroupAdd";
     };
 
+    ignoreFile = quadletOptions.mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      example = "/path/to/.customignore";
+      cli = "--ignorefile";
+      property = "IgnoreFile";
+    };
+
     tag = quadletOptions.mkOption {
       type = types.nullOr types.str;
       default = null;
@@ -121,7 +146,10 @@ let
     };
 
     labels = quadletOptions.mkOption {
-      type = types.oneOf [ (types.listOf types.str) (types.attrsOf types.str) ];
+      type = types.oneOf [
+        (types.listOf types.str)
+        (types.attrsOf types.str)
+      ];
       default = { };
       example = {
         foo = "bar";
@@ -240,18 +268,23 @@ in
       unitConfig = {
         Unit = {
           Description = "Podman build ${name}";
-        } // config.unitConfig;
+        }
+        // config.unitConfig;
         Build = quadletUtils.configToProperties buildConfig buildOpts;
         Service = serviceConfigDefault // config.serviceConfig;
-      } // (if quadlet == { } then { } else { Quadlet = quadlet; });
+      }
+      // (if quadlet == { } then { } else { Quadlet = quadlet; });
     in
-    {
-      _serviceName = "${name}-build";
-      _configText = if config.rawConfig != null
-        then config.rawConfig
-        else quadletUtils.unitConfigToText unitConfig;
-      _autoStart = config.autoStart;
-      _autoEscapeRequired = quadletUtils.autoEscapeRequired buildConfig buildOpts;
-      ref = "${name}.build";
-    };
+    lib.pipe
+      {
+        _serviceName = "${name}-build";
+        _configText =
+          if config.rawConfig != null then config.rawConfig else quadletUtils.unitConfigToText unitConfig;
+        _autoStart = config.autoStart;
+        _autoEscapeRequired = quadletUtils.autoEscapeRequired buildConfig buildOpts;
+        ref = "${name}.build";
+      }
+      [
+        (quadletOptions.applyRootlessConfig config)
+      ];
 }

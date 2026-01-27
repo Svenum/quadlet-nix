@@ -76,6 +76,14 @@ let
       encoders.scalar = encoders.scalar.quotedEscaped;
     };
 
+    interfaceName = quadletOptions.mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      example = "enp1";
+      cli = "--interface-name";
+      property = "InterfaceName";
+    };
+
     internal = quadletOptions.mkOption {
       type = types.nullOr types.bool;
       default = null;
@@ -201,12 +209,16 @@ in
       }
       // (if quadlet == { } then { } else { Quadlet = quadlet; });
     in
-    {
-      _serviceName = "${name}-network";
-      _configText =
-        if config.rawConfig != null then config.rawConfig else quadletUtils.unitConfigToText unitConfig;
-      _autoStart = config.autoStart;
-      _autoEscapeRequired = quadletUtils.autoEscapeRequired networkConfig networkOpts;
-      ref = "${name}.network";
-    };
+    lib.pipe
+      {
+        _serviceName = "${name}-network";
+        _configText =
+          if config.rawConfig != null then config.rawConfig else quadletUtils.unitConfigToText unitConfig;
+        _autoStart = config.autoStart;
+        _autoEscapeRequired = quadletUtils.autoEscapeRequired networkConfig networkOpts;
+        ref = "${name}.network";
+      }
+      [
+        (quadletOptions.applyRootlessConfig config)
+      ];
 }
